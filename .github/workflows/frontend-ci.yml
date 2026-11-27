@@ -1,0 +1,44 @@
+name: Frontend CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: anhvty/mern-todo-fe
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build-test-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Build frontend image
+        run: docker build --tag "$IMAGE:$GITHUB_SHA" .
+
+      - name: Verify frontend compiles
+        run: docker run --rm "$IMAGE:$GITHUB_SHA" sh -ec 'npm run build && test -s build/index.html'
+
+      - name: Sign in to Docker Hub
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: docker/login-action@v4
+        with:
+          username: anhvty
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push frontend image
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: docker push "$IMAGE:$GITHUB_SHA"
